@@ -3,41 +3,88 @@ import threading
 import time
 import sys
 
+
 class TCPClient:
+
+    my_info = {}
+
     def __init__(self, server_address, server_port):
         self.server_address = server_address
         self.server_port = server_port
         self.TOKEN_MAX_BYTE = 255
+        self.ROOM_NAME_MAX_BYTE = 2 ** 8 # 入力の部分で関数を作る
+        self.PAYLOAD_MAX_BYTE = 2 ** 29 # 入力の部分で関数を作る
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
+    # ヘッダーの作成
     def protocol_header(self, room_name, operation, state, payload):
         room_name_size = len(room_name)
         payload_size = len(payload)
         return room_name_size.to_bytes(1, "big") + operation.to_bytes(1, "big") + state.to_bytes(1,"big") + payload_size.to_bytes(29, "big")
     
-    def tcp_main(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # ユーザー名の入力
+    def input_username(self):
+        username = input("ユーザー名を入力してください -> ")
 
+        if len(username) > self.PAYLOAD_MAX_BYTE:
+            print("2^29バイトを超えています. 再度入力してください.")
+            return self.input_username()
+        elif len(username) == 0:
+            return self.input_username()
+        else:
+            return username
+        
+    # ルーム名の入力
+    def input_roomname(self, operation):
+
+        if (operation == 1):
+            room_name = input("作成するルーム名を入力してください -> ")
+            if len(room_name) > self.ROOM_NAME_MAX_BYTE:
+                print("2^8バイトを超えています. 再度入力してください.")
+                return self.input_roomname()
+            elif len(room_name) == 0:
+                return self.input_roomname()
+            else:
+                return room_name
+        
+        else:
+            room_name = input("参加したいルーム名を入力してください -> ")
+            if len(room_name) > self.ROOM_NAME_MAX_BYTE:
+                print("2^8バイトを超えています. 再度入力してください.")
+                return self.input_roomname()
+            elif len(room_name) == 0:
+                return self.input_roomname()
+            else:
+                return room_name
+    
+
+    def tcp_main(self):
+        #sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # サーバーが待ち受けているポートにソケットします．
         print("connecting to {}".format(self.server_address, self.server_port))
 
         try:
             # 接続後，サーバーとクライアントが相互に読み書きできるようになります．
-            sock.connect((self.server_address, self.server_port))
+            self.sock.connect((self.server_address, self.server_port))
         except socket.error as err:
             print("Error connectiong to server: ", err)
             return
             #print(err)
             #sys.exit(1)
-
-        print("接続できました")
+        
+        print("接続できました.")
+        TCPClient.my_address = self.sock.getsockname()
+        #print(self.sock.getsockname())
+        #print(TCPClient.my_address)
+    
 
         try:
-            user_name = input("ユーザー名を入力してください -> ")
+            user_name = self.input_username()
 
             operation = int(input("1または2を入力してください (1: ルーム作成, 2: ルームに参加) -> "))
 
             if (operation == 1):
-                room_name = input("ルーム名を入力してください -> ")
+                room_name = self.input_roomname(operation)
             else:
                 room_name = " "
                 
@@ -59,20 +106,20 @@ class TCPClient:
             '''
 
             if (operation == 1):
-                sock.send(data) # ヘッダー + ボディ を送信
-                token = sock.recv(self.TOKEN_MAX_BYTE)
+                self.sock.send(data) # ヘッダー + ボディ を送信
+                my_token = self.sock.recv(self.TOKEN_MAX_BYTE)
             else:
-                sock.send(data) # ヘッダー + ボディ を送信
-                room_name_list = sock.recv(4096)
+                self.sock.send(data) # ヘッダー + ボディ を送信
+                room_name_list = self.sock.recv(4096)
                 print(room_name_list)
-                room_name = input("参加したいルーム名を入力してください -> ")
+                room_name = self.input_roomname(operation)
                 room_name_bytes = room_name.encode("utf-8")
-                sock.send(room_name_bytes)
-                token = sock.recv(self.TOKEN_MAX_BYTE)
+                self.sock.send(room_name_bytes)
+                my_token = self.sock.recv(self.TOKEN_MAX_BYTE)
                 
-
-
-            print("tokenを受け取りました -> ", token)
+            print("tokenを受け取りました -> ", my_token)
+            self.my_info = {my_token : [room_name, user_name]} 
+            print(self.my_info)
 
         except socket.error as err:
             print("Socket error: ", err)
@@ -81,48 +128,80 @@ class TCPClient:
 
         finally:
             print("closing socket")
-            sock.close()
-        
-'''
+            # my_address = self.sock.getsockname()
+            self.sock.close()
+    
+    def start(self):
+        self.tcp_main()
+        return self.my_info
+
 class UDPClient:
-    def __init__(self, server_address, server_port):
+    def __init__(self, server_address, server_port, my_info):
         self.server_address = server_address
         self.server_port = server_port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.client_address = ''
-        self.client_port = self.find_free_port()
-        self.client_info = str(self.client_address)+ "," + str(self.client_port)
-        self.sock.bind((self.client_address, self.client_port))
+        self.my_info = my_info
+        #self.client_address = ""
+        #self.client_port = TCPClient.my_address # self.find_free_port()
+        #self.client_info = str(self.client_address)+ "," + str(self.client_port)
+        # self.sock.bind((self.client_address, self.client_port))
+        self.room_name = ''
         self.username = ''
     
     # サーバに接続後,最初にusernameを入力
-    def input_username(self):
+    def send_username(self):
             USER_NAME_MAX_BYTE_SIZE = 255
-            self.username = input("Please enter your username: ") # username入力
+
+            # ここらへんの処理は関数化したい
+            for token in self.my_info:
+                my_token = token
+            #print(token)
+            self.room_name = self.my_info[my_token][0]
+            #self.username = self.my_info[my_token][1]
+            print(self.room_name)
+
+            roomname_size = len(self.room_name).to_bytes(1, "big")
+            token_size = len(my_token).to_bytes(1, "big")
+            #username_size = len(self.username).to_bytes(1, "big")
+
+            header = roomname_size + token_size
+            data = header + self.room_name.encode("utf-8") + my_token
+            '''
             # 何も入力がなければやり直し
             if self.username == '':
                 print("Input is incorrect!")
                 self.input_username()
-
-            username_size = len(self.username.encode("utf-8"))
-
+            
             # バイトサイズが255バイトより大きければやり直し
             if username_size > USER_NAME_MAX_BYTE_SIZE:
                 print("User name byte: " + str(username_size) + " is too large.")
                 print("The user name must not exceed 255 bytes.")
                 self.input_username()
-            
+            '''
+
             # 問題がなければサーバに送信
-            self.sock.sendto(self.username.encode('utf-8'), (self.server_address, self.server_port))
-    
+            self.sock.sendto(data, (self.server_address, self.server_port))
+            
+
     # username入力後の処理
     def send_message(self):
         while True:
             message = input("")
             print("\033[1A\033[1A") # "\033[1A": カーソルを現在の行の先頭に移動 -> これにより、ターミナル上の出力を更新または消去
             #print("You: " + message)
-            usernamelen = len(self.username).to_bytes(1, byteorder='big')# UTF-8 エンコーディングを使用して変換 (指定されたバイト数（ここでは1バイト）のバイト列に変換します)
-            data = usernamelen + self.username.encode() + message.encode() # ユーザー名とメッセージを結合して送信
+            #usernamelen = len(self.username).to_bytes(1, byteorder='big')# UTF-8 エンコーディングを使用して変換 (指定されたバイト数（ここでは1バイト）のバイト列に変換します)
+            #data = usernamelen + self.username.encode() + message.encode() # ユーザー名とメッセージを結合して送信
+            # ここらへんの処理は関数化したい
+            for token in self.my_info:
+                my_token = token
+            #print(token)
+            self.room_name = self.my_info[my_token][0]
+            roomname_size = len(self.room_name).to_bytes(1, "big")
+            token_size = len(my_token).to_bytes(1, "big")
+            #username_size = len(self.username).to_bytes(1, "big")
+
+            header = roomname_size + token_size
+            data = header + self.room_name.encode("utf-8") + my_token + message.encode()
             # サーバへのデータ送信
             self.sock.sendto(data, (self.server_address, self.server_port))
             time.sleep(0.1)
@@ -131,15 +210,21 @@ class UDPClient:
     def receive_message(self):
         while True:
             rcv_data = self.sock.recvfrom(4096)[0].decode("utf-8")
-
+            
             if (rcv_data == "Timeout!"): # タイムアウト処理
                 print(rcv_data)
                 self.sock.close()
                 sys.exit()
+
+            elif (rcv_data == "exit!"): # ルームホストが退出した場合
+                print(rcv_data)
+                self.sock.close()
+                sys.exit()
+                
             else:
                 print(rcv_data)
 
-
+    '''
     # 空きポートの割り当て
     def find_free_port(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -147,9 +232,17 @@ class UDPClient:
         port = sock.getsockname()[1] # ソケットがバインドされているアドレス情報を取得(port番号)
         sock.close()
         return port
+    '''
 
     def start(self):
-        self.input_username()
+        self.send_username()
+        #print(self.my_info)
+        
+        print("self.sock.getsockname(): ", self.sock.getsockname())
+        # print("self.client_address: {}, self.client_port: {}".format(self.client_port, self.client_port))
+        print("TCPClient.my_address: ", TCPClient.my_address)
+        
+        # print("TCPClient.my_address", TCPClient.my_address[1])
         # 並列処理
         thread_send = threading.Thread(target = self.send_message)
         thread_receive = threading.Thread(target = self.receive_message)
@@ -158,15 +251,16 @@ class UDPClient:
         thread_receive.start()
         thread_send.join()
         thread_receive.join()
-'''
+
 
 if __name__ == "__main__":
 
     server_address = '0.0.0.0'
-    server_port = 9001
+    tcp_server_port = 9001
+    udp_server_port = 9002
 
-    client = TCPClient(server_address, server_port)
-    client.tcp_main()
+    tcp_client = TCPClient(server_address, tcp_server_port)
+    my_info = tcp_client.start()
 
-    #client = UDPClient(server_address, server_port)
-    #client.start()
+    udp_client = UDPClient(server_address, udp_server_port, my_info)
+    udp_client.start()
