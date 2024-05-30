@@ -3,8 +3,6 @@ import threading
 import time
 import secrets
 
-
-
 class TCPServer:
 
     room_members_map = {} # {room_name : [token, token, token, ...]}
@@ -54,11 +52,8 @@ class TCPServer:
                 room_name = body[:room_name_size].decode("utf-8")
                 payload = body[room_name_size:room_name_size + payload_size].decode("utf-8") # username
 
-                # print("body: ", body)
                 print("room_name: ", room_name)
                 print("payload: ", payload)
-                
-                #print(self.client_token)
 
                 token = secrets.token_bytes(self.TOKEN_MAX_BYTE)
                 
@@ -67,7 +62,6 @@ class TCPServer:
                     host = 1
                     connection.send(token)
                     self.room_members_map[room_name] = [token]
-                    #print(self.room_member_map)
                     print("新しいルームを作成します (Host: {})".format(payload))
 
                 elif (operation == 2):
@@ -77,7 +71,6 @@ class TCPServer:
                     print("クライアントが参加したいルーム名を受け取りました -> ", room_name)
                     self.room_members_map[room_name].append(token)
                     connection.send(token)
-                    #print(self.room_member_map)
                     print("既存のルームに参加します")
 
                 
@@ -91,12 +84,6 @@ class TCPServer:
 
     def start(self):
         self.tcp_main()
-        #thread_main = threading.Thread(target = self.tcp_main)
-        #thread_main.start()
-        #thread_main.join()
-
-
-
 
 
 class UDPServer:
@@ -116,21 +103,14 @@ class UDPServer:
         while True:
             
             data, client_address = self.sock.recvfrom(4096) # 最大4096byteのデータを受信
-            #print("connection from ", client_address)
 
             header = data[:2]
             room_name_size = int.from_bytes(header[:1], "big")
             token_size = int.from_bytes(header[1:2], "big")
-            #print(roomname_size, token_size)
 
             body = data[2:]
             room_name = body[:room_name_size].decode("utf-8")
             token = body[room_name_size:room_name_size + token_size]
-            #print("roomname:",roomname)
-            #print("token:\n", token)
-            #print(self.room_members_map)
-            #print('TCPSever: ', TCPServer.clients_map)
-
 
             # TCPのアドレスに上書き
             if self.clients_map[token][0] != client_address:
@@ -144,22 +124,6 @@ class UDPServer:
                 print("Room: {}, User: {}".format(room_name, username))
                 print(message,"\n")
                 self.relay_message(room_name, message) # 接続ユーザ全員に送信(送信元のユーザも含む)
-
-            '''
-            # 新しいクライアントからの受信 -> clientsリストにアドレスを保存
-            if (not client_address in self.clientsmap):
-                self.tcp_server_roommember[roomname][token] = client_address
-                print(self.tcp_server_roommember)
-                #data = data.decode('utf-8')
-                #print("新しいユーザーです -> ", name)
-                #self.clients.append(client_address)
-                #self.clientsmap.update({client_address : [username, time.time()]})
-                #print(client_address)
-                #print("新しいユーザーです -> ", self.clientsmap[client_address], time.ctime())
-                #print("新しいユーザーです -> ", data)
-                #tcp_server_roommem = TCPServer.room_member_map
-                #print(self.tcp_server_roommember)
-            '''
     
     # リレーシステム
     def relay_message(self, room_name, message):
@@ -173,7 +137,7 @@ class UDPServer:
     # 各クライアントの最後の最後のメッセージ送信時刻を追跡
     def send_time_tracking(self):
         while True:
-            time.sleep(60)# 1分単位で追跡
+            time.sleep(60) # 1分ごとに追跡
             print("スリープ解除")
             try:
                 for client_token, client_info_list in self.clients_map.items():
@@ -183,9 +147,8 @@ class UDPServer:
                         belonging_room = client_info_list[1] # 該当tokenが所属しているルーム
                         deleted_user = client_info_list[2] # 該当トークンユーザー
                         
-
-                        # 削除されるクライアントがルームホストの場合の処理をここに入れたい
-                        if (self.clients_map[client_token][3] == 1): # 削除されるユーザーがhostの場合
+                        # 削除されるユーザーがhostの場合
+                        if (self.clients_map[client_token][3] == 1): 
                             notice = "ホストの{}がルームを退出しました．".format(deleted_user)
                             self.relay_message(belonging_room, notice)
                             self.relay_message(belonging_room, "exit!")
@@ -224,12 +187,3 @@ if __name__ == "__main__":
 
     thread_tcp.join()
     thread_udp.join()
-
-
-
-    '''
-    tcp_server = TCPServer(server_address, tcp_server_port)
-    udp_server = UDPServer(server_address, udp_server_port)
-    tcp_server.start()
-    udp_server.start()
-    '''
