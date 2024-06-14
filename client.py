@@ -110,9 +110,9 @@ class TCPClient:
                 self.sock.send(room_name_bytes)
                 my_token = self.sock.recv(self.TOKEN_MAX_BYTE)
                 
-            print("tokenを受け取りました -> ", my_token)
+            #print("tokenを受け取りました -> ", my_token)
             self.my_info = {my_token : [room_name, user_name]} 
-            print(self.my_info)
+            #print(self.my_info)
 
         except socket.error as err:
             print("Socket error: ", err)

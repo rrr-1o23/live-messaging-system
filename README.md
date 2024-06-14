@@ -1,11 +1,42 @@
 # Live Messaging System
-クライアントがサーバのリソースを活用してチャットルームを設立及び運営できる分散型システムです。
 
-## 操作方法
-1. server.pyを立ち上げた後に，client.pyを立ち上げる．
-2. クライアント側での操作
-    - 名前の入力
-    - 1:ルーム作成 or 2:ルームに参加 を入力
-        - 1:ルーム作成を選択した場合 -> ルーム名の入力
-        - 2:ルームに参加を選択した場合 -> 表示されるルーム名から参加したいルーム名を入力
-3. ルームに参加できればルーム内のメンバーでチャット可能
+#### 使用技術
+<p style="display: inline">
+<img src="https://img.shields.io/badge/-Linux-212121.svg?logo=linux&style=popout">
+<img src="https://img.shields.io/badge/-Python-FFC107.svg?logo=python&style=popout">
+</p>
+
+&nbsp;
+
+## 概要
+
+Live Messagin Systemを開発しました．クライアントがサーバのリソースを利用してチャットルームの作成・参加ができる分散型システムです.プロセス間通信にはソケットプログラミングを採用し，重要な操作にはTCPソケット，リアルタイム性が重視される操作にはUDPソケットを採用しています．
+
+#### 操作方法
+ターミナルからserver.pyを立ち上げる<br>
+```bash
+$ python server.py
+サーバが起動しました
+```
+別のターミナルを立ち上げclient.pyを立ち上げる<br>
+```bash
+$ python client.py
+connecting to 0.0.0.0
+接続できました.
+
+ユーザー名を入力してください -> User1 
+
+1または2を入力してください (1: ルーム作成, 2: ルームに参加) -> 1
+チャット開始
+```
+client.pyをさらに別のターミナルを立ち上げルームに参加すれば，クライアント同士でチャット可能．
+
+&nbsp;
+
+## 環境
+| OS・言語・ライブラリ | バージョン |
+| :------- | :------ |
+| Ubuntu | 22.04.4 LTS |
+| Python | 3.10.12 |
+
+&nbsp;
